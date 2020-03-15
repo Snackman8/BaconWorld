@@ -1,48 +1,66 @@
-<h1>This is Bacon World!</h1>
+<head>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reconnecting-websocket/1.0.0/reconnecting-websocket.min.js"></script>
+</head>
 
-<canvas id="myCanvas" width="1920" height="1000" style="border:1px solid #d3d3d3;" tabindex="0">
-
-<!-- <img id=map src='/map'> -->
+<body>
+  <canvas id="myCanvas" width="$$CANVAS_WIDTH$$" height="$$CANVAS_HEIGHT$$" style="border:1px solid #d3d3d3;" tabindex="0">
+</body>>
 
 <script>
-var c = document.getElementById("myCanvas");
-var ctx = c.getContext("2d");
+  var c = document.getElementById("myCanvas");
+  var ctx = c.getContext("2d");
+  var ws = new ReconnectingWebSocket('ws://$$HOST$$/websocket');
+  ctx.textBaseline = 'top'  
+  ctx.font = "15px Arial";
 
-var ws = new WebSocket("ws://linuxdev:8889/websocket");
-ws.onopen = function() {
-   ws.send("refresh");
-};
+  // Keyboard Handlers
+  c.addEventListener('keydown', function(e) { ws.send(JSON.stringify({'cmd': 'event_keydown', 'keycode': e.keyCode})); }, true);
+  c.addEventListener('keyup',   function(e) { ws.send(JSON.stringify({'cmd': 'event_keyup',   'keycode': e.keyCode})); }, true);
 
-// stupid variable img1 scoping issues
-function aa(key, coords) {
+  // Websocket
+  ws.onopen = function() {
+    ws.send(JSON.stringify({'cmd': 'set_target_mode', 'mode': 'browser'}));  
+    ws.send(JSON.stringify({'cmd': 'refresh'}));
+  };
+
+  // Drawing the image must be done in a separate function due to variable scoping issues with onload
+  image_count = 0;
+  
+  function draw_image(key, coords) {
     var img1 = new Image();
     img1.onload = function() {
         for (var i = 0; i < coords.length; i++) {
             ctx.drawImage(img1, coords[i][0], coords[i][1]);
         }
+        image_count = image_count + 1;
     }
     img1.src = key;
-}
+  }
 
-ws.onmessage = function (evt) {
-    var jso = JSON.parse(evt.data);
-
-    for (var key in jso) {
-        aa(key, jso[key]);
+  // Handle when we receive messages 
+  var json_buffer = '';
+  
+  ws.onmessage = function (evt) {
+    json_buffer = json_buffer + evt.data;
+    json_length = json_buffer.substring(0, json_buffer.indexOf('{'));
+    if (json_buffer.length >= json_buffer.indexOf('{') + parseInt(json_length)) {
+      var jso = JSON.parse(json_buffer.substr(json_buffer.indexOf('{'), json_length));
+      json_buffer = json_buffer.substring(json_buffer.indexOf('{') + json_length);
+      if (jso['cmd'] == 'update_render') {
+        image_count = 0;
+        for (var key in jso['data']) {
+          draw_image(key, jso['data'][key]);
+        }
+      }
+      if (jso['cmd'] == 'draw_text') {
+        console.log(jso);
+        ctx.fillStyle = jso['color']
+        ctx.font = jso['font']
+        ctx.fillText(jso['text'], jso['x'], jso['y'])
+      }
+    } else {
+      console.log('not enough data');
     }
-};
-
-
-c.addEventListener('keydown', doKeyDown, true);
-c.addEventListener('keyup', doKeyUp, true);
-
-function doKeyDown(e) {
-    ws.send('keydown ' + e.keyCode);
-}
-
-function doKeyUp(e) {
-    ws.send('keyup ' + e.keyCode);
-}
-
-
+  };
 </script>

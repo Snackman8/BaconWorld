@@ -4,6 +4,8 @@
 import base64
 from collections import OrderedDict
 import io
+import json
+import time
 import tornado.ioloop
 import tornado.web
 import tornado.websocket
@@ -13,9 +15,11 @@ from PIL import Image
 # --------------------------------------------------
 # Constants
 # --------------------------------------------------
-WORLD_WIDTH = 120
-WORLD_HEIGHT = 60
 PLANE_NAMES = ['ground', 'animals']
+TILE_WIDTH = 16
+TILE_HEIGHT = 16
+WORLD_HEIGHT = 50
+WORLD_WIDTH = 110
 
 
 # --------------------------------------------------
@@ -23,33 +27,20 @@ PLANE_NAMES = ['ground', 'animals']
 # --------------------------------------------------
 gPLANES = OrderedDict()
 gIMAGE_STRS = OrderedDict()
+gKEY_STATES = set()
 gRENDERQUEUE = OrderedDict()
-gKEYSTATES = set()
+gTEXT = OrderedDict()
+
 
 # --------------------------------------------------
 # Functions
 # --------------------------------------------------
 def clear():
-    global gPLANES
-    
     for y in range(0, WORLD_HEIGHT):
         for x in range(0, WORLD_WIDTH):
             for p in PLANE_NAMES:
                 gPLANES[p][y][x] = ''
-    
     refresh()
-#             gPLAN
-#             
-#             update_render_queue(x, y, 'ground', 'grass')
-#     send_update_message()
-
-def handle_keydown(keycode):
-    global gKEYSTATES
-    gKEYSTATES.add(keycode)
-
-def handle_keyup(keycode):
-    global gKEYSTATES
-    gKEYSTATES.remove(keycode)
 
 
 def img_to_str(img):
@@ -59,139 +50,131 @@ def img_to_str(img):
 
 
 def init_globals():
-    global gPLANES
-    global gIMAGE_STRS    
     for p in PLANE_NAMES:
         gPLANES[p] = [[''] * WORLD_WIDTH for _ in range(0, WORLD_HEIGHT)]
         gIMAGE_STRS[p] = OrderedDict()
     
-    gIMAGE_STRS['ground'][''] = img_to_str(Image.new('RGB', (16, 16), color = 'black'))
-    gIMAGE_STRS['ground']['grass'] = img_to_str(Image.new('RGB', (16, 16), color = 'green'))
-    gIMAGE_STRS['animals']['pig'] = img_to_str(Image.new('RGB', (16, 16), color = 'pink'))
-    gIMAGE_STRS['animals']['cow'] = img_to_str(Image.new('RGB', (16, 16), color = 'orange'))
+    gIMAGE_STRS['ground'][''] = img_to_str(Image.new('RGB', (TILE_WIDTH, TILE_HEIGHT), color = 'black'))
+    gIMAGE_STRS['ground']['grass'] = img_to_str(Image.new('RGB', (TILE_WIDTH, TILE_HEIGHT), color = 'green'))
+    gIMAGE_STRS['animals']['pig'] = img_to_str(Image.new('RGB', (TILE_WIDTH, TILE_HEIGHT), color = 'pink'))
+    gIMAGE_STRS['animals']['cow'] = img_to_str(Image.new('RGB', (TILE_WIDTH, TILE_HEIGHT), color = 'orange'))
     clear()
 
 
-def refresh():
+def refresh(x1=0, y1=0, x2=WORLD_WIDTH, y2=WORLD_HEIGHT, refresh_text=True):
 #    send_update_message()
-    global gRENDERQUEUE
-    gRENDERQUEUE = {}
-    for y in range(0, WORLD_HEIGHT):
-        for x in range(0, WORLD_WIDTH):
+    gRENDERQUEUE.clear()
+    for y in range(y1, y2):
+        for x in range(x1, x2):
             update_render_queue(x, y)
-#             sent = False
-#             for p in PLANE_NAMES[::-1]:
-#                 if gPLANES[p][y][x] != '':
-#                     update_render_queue(x, y, p, gPLANES[p][y][x])
-#                     sent = True
-#             if not sent:
-#                 update_render_queue(x, y, p, 'grass')
     send_update_message()
+    if refresh_text:
+        # this is a really bad hack!
+        time.sleep(0.1)
+        for k in gTEXT:
+            WSHandler.send_message(gTEXT[k])
 
 
-def send_update_message():
-    global gRENDERQUEUE
-    EchoWebSocket.send_message(gRENDERQUEUE)
-    gRENDERQUEUE = {}
+def send_update_message():    
+    WSHandler.send_message({'cmd': 'update_render', 'target': 'browser', 'data': gRENDERQUEUE})
+    gRENDERQUEUE.clear()
 
 
 def update_render_queue(x, y):
-    global gRENDERQUEUE
-    if x >=0 and x < WORLD_WIDTH and y >= 0 and y < WORLD_HEIGHT:
-        # search for the first image that works
-        for p in PLANE_NAMES[::-1]:
-            if gPLANES[p][y][x] in gIMAGE_STRS[p]:
-                img_str = gIMAGE_STRS[p][gPLANES[p][y][x]]
-                if img_str not in  gRENDERQUEUE:
-                    gRENDERQUEUE[img_str] = []
-                gRENDERQUEUE[img_str].append((x * 16, y * 16))
-                return
+    # search for the first image that works
+    for p in PLANE_NAMES[::-1]:
+        if gPLANES[p][y][x] in gIMAGE_STRS[p]:
+            img_str = gIMAGE_STRS[p][gPLANES[p][y][x]]
+            gRENDERQUEUE.setdefault(img_str, []).append((x * TILE_WIDTH, y * TILE_HEIGHT))
+            return
 
 
 # --------------------------------------------------
-# Handlers
+# Tornado Handlers
 # --------------------------------------------------
-class EchoWebSocket(tornado.websocket.WebSocketHandler):
+class MainHandler(tornado.web.RequestHandler):
+    def get(self, matched):
+        # process based on matched portion of url
+        if matched == '':
+            # main index page handler
+            with open ('www/index.html', 'r') as f:
+                s = f.read().replace('$$HOST$$', self.request.host)
+                s = s.replace('$$CANVAS_HEIGHT$$', str(WORLD_HEIGHT * TILE_HEIGHT))
+                s = s.replace('$$CANVAS_WIDTH$$', str(WORLD_WIDTH * TILE_WIDTH))
+                self.write(s)
+        else:
+            raise tornado.web.HTTPError(404)
+
+
+class WSHandler(tornado.websocket.WebSocketHandler):
+    # class variable to keep track of all active websockets
     live_websockets = set()
     
     def open(self):
+        # called when web socket opens
         self.set_nodelay(True)
         self.live_websockets.add(self)
 
     def on_message(self, message):
-        if message == 'refresh':
+        js = json.loads(message)
+        if js['cmd'] == 'set_target_mode':
+            self.target_mode = js['mode']
+        if js['cmd'] == 'event_keydown':
+            if js['keycode'] not in gKEY_STATES:
+                gKEY_STATES.add(js['keycode'])
+                js['target'] = 'client'
+                WSHandler.send_message(js)
+        if js['cmd'] == 'event_keyup':
+            gKEY_STATES.remove(js['keycode'])
+            js['target'] = 'client'
+            WSHandler.send_message(js)
+        if js['cmd'] == 'clear':
+            clear()
+        if js['cmd'] == 'draw_text':
+            js['target'] = 'browser'
+            js['x'] = js['x'] * TILE_WIDTH
+            js['y'] = js['y'] * TILE_HEIGHT
+            gTEXT[js['tid']] = js
+            WSHandler.send_message(js)
+        if js['cmd'] == 'clear_text':
+            if js['tid'] in gTEXT:
+                txt = gTEXT[js['tid']]
+                del gTEXT[js['tid']]
+                x = txt['x'] / TILE_WIDTH
+                y = txt['y'] / TILE_HEIGHT
+                refresh(x, y, x + js['width'], y + js['height'], refresh_text=False)
+        if js['cmd'] == 'flush':
+            send_update_message()
+        if js['cmd'] == 'refresh':
             refresh()
-        if message.startswith('keyup '):
-            print 'KEYUP!'
-            handle_keyup(message.partition(' ')[2])
-        if message.startswith('keydown '):
-            handle_keydown(message.partition(' ')[2])
-
-    def on_close(self):
-        print("WebSocket closed")
+        if js['cmd'] == 'set_image':
+            gIMAGE_STRS[js['plane']][js['key']] = js['data']
+        if js['cmd'] == 'update_object':
+            if js['x'] >=0 and js['x'] < WORLD_WIDTH and js['y'] >= 0 and js['y'] < WORLD_HEIGHT:
+                gPLANES[js['plane']][js['y']][js['x']] = js['newval']
+                update_render_queue(js['x'], js['y'])
     
     @classmethod
-    def send_message(cls, message):
-        removable = set()
-        for ws in cls.live_websockets:
+    def send_message(cls, d):
+        js = json.dumps(d)
+        for ws in list(cls.live_websockets):
             if not ws.ws_connection or not ws.ws_connection.stream.socket:
-                removable.add(ws)
+                cls.live_websockets.remove(ws)
             else:
-                ws.write_message(message)
-        for ws in removable:
-            cls.live_websockets.remove(ws)        
+                if d['target'] == ws.target_mode:
+                    ws.write_message(str(len(js)) + js)
 
 
-class MainHandler(tornado.web.RequestHandler):
-    def get(self):
-        f = open('www/index.html', 'r')
-        s = f.read()
-        f.close()
-        self.write(s)
-
-
-class UpdateHandler(tornado.web.RequestHandler):
-    def get(self):
-        x = int(self.get_argument('x'))
-        y = int(self.get_argument('y'))
-        if x >=0 and x < WORLD_WIDTH and y >= 0 and y < WORLD_HEIGHT:
-            plane = self.get_argument('plane')
-            newval = self.get_argument('newval')
-            gPLANES[plane][y][x] = newval
-            update_render_queue(x, y)
-
-class SetImageHandler(tornado.web.RequestHandler):
-    def get(self):
-        global gIMAGE_STRS
-        plane = self.get_argument('plane')
-        key = self.get_argument('key')
-        data = self.get_argument('data')
-        gIMAGE_STRS[plane][key] = data
-
-class KeystatesHandler(tornado.web.RequestHandler):
-    def get(self):
-        self.write(' '.join(list(gKEYSTATES)))
-
-class FlushHandler(tornado.web.RequestHandler):
-    def get(self):
-        send_update_message()
-
-class ClearHandler(tornado.web.RequestHandler):
-    def get(self):
-        clear()
-
-
+# --------------------------------------------------
+# Tornado App
+# --------------------------------------------------
 def make_app():
     init_globals()
     return tornado.web.Application([
-        (r"/", MainHandler),
-        (r"/update", UpdateHandler),
-        (r"/flush", FlushHandler),
-        (r"/clear", ClearHandler),
-        (r"/keystates", KeystatesHandler),
-        (r"/set_image", SetImageHandler),
-        (r"/websocket", EchoWebSocket),
+        (r"/websocket", WSHandler),
+        (r"/(.*)", MainHandler),
     ])
+
 
 if __name__ == "__main__":
     app = make_app()
