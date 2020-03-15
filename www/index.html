@@ -1,0 +1,48 @@
+<h1>This is Bacon World!</h1>
+
+<canvas id="myCanvas" width="1920" height="1000" style="border:1px solid #d3d3d3;" tabindex="0">
+
+<!-- <img id=map src='/map'> -->
+
+<script>
+var c = document.getElementById("myCanvas");
+var ctx = c.getContext("2d");
+
+var ws = new WebSocket("ws://linuxdev:8889/websocket");
+ws.onopen = function() {
+   ws.send("refresh");
+};
+
+// stupid variable img1 scoping issues
+function aa(key, coords) {
+    var img1 = new Image();
+    img1.onload = function() {
+        for (var i = 0; i < coords.length; i++) {
+            ctx.drawImage(img1, coords[i][0], coords[i][1]);
+        }
+    }
+    img1.src = key;
+}
+
+ws.onmessage = function (evt) {
+    var jso = JSON.parse(evt.data);
+
+    for (var key in jso) {
+        aa(key, jso[key]);
+    }
+};
+
+
+c.addEventListener('keydown', doKeyDown, true);
+c.addEventListener('keyup', doKeyUp, true);
+
+function doKeyDown(e) {
+    ws.send('keydown ' + e.keyCode);
+}
+
+function doKeyUp(e) {
+    ws.send('keyup ' + e.keyCode);
+}
+
+
+</script>
