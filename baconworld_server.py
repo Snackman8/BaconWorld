@@ -1,6 +1,7 @@
 # --------------------------------------------------
 # Imports
 # --------------------------------------------------
+import argparse
 import base64
 from collections import OrderedDict
 import io
@@ -177,6 +178,19 @@ def make_app():
 
 
 if __name__ == "__main__":
+    parser =argparse.ArgumentParser(description='Baconworld Server')
+    parser.add_argument('--port', default=8889, help='Port to run the server on')
+    parser.add_argument('--tile_height', type=int, default=TILE_HEIGHT, help='Height of a tile')
+    parser.add_argument('--tile_width', type=int, default=TILE_WIDTH, help='Width of a tile')
+    parser.add_argument('--world_height', type=int, default=WORLD_HEIGHT, help='Height of the world in tiles')
+    parser.add_argument('--world_width', type=int, default=WORLD_WIDTH, help='Width of the world in tiles')
+    args = parser.parse_args()
+    TILE_WIDTH = args.tile_width
+    TILE_HEIGHT = args.tile_height
+    WORLD_WIDTH = args.world_width
+    WORLD_HEIGHT = args.world_height
+
+    print 'Starting Bacon World Server on port %d with tile size of %dx%d and world size of %dx%d' % (args.port, TILE_WIDTH, TILE_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT)    
     app = make_app()
-    app.listen(8889)
+    app.listen(args.port)
     tornado.ioloop.IOLoop.current().start()
