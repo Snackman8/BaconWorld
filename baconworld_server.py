@@ -41,7 +41,7 @@ def clear():
         for x in range(0, WORLD_WIDTH):
             for p in PLANE_NAMES:
                 gPLANES[p][y][x] = ''
-    refresh()
+    refresh(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
 
 
 def img_to_str(img):
@@ -62,7 +62,7 @@ def init_globals():
     clear()
 
 
-def refresh(x1=0, y1=0, x2=WORLD_WIDTH, y2=WORLD_HEIGHT, refresh_text=True):
+def refresh(x1, y1, x2, y2, refresh_text=True):
 #    send_update_message()
     gRENDERQUEUE.clear()
     for y in range(y1, y2):
@@ -147,7 +147,7 @@ class WSHandler(tornado.websocket.WebSocketHandler):
         if js['cmd'] == 'flush':
             send_update_message()
         if js['cmd'] == 'refresh':
-            refresh()
+            refresh(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
         if js['cmd'] == 'set_image':
             gIMAGE_STRS[js['plane']][js['key']] = js['data']
         if js['cmd'] == 'update_object':

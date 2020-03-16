@@ -24,8 +24,8 @@ draw_text('TEXT2', 'Hello World', 0, 10, font='12px Arial', color='cyan')
 flush()
    
 # draw the initial pig
-x = 50
-y = 25
+x = 30
+y = 15
 update_object(x, y, 'animals', 'pig')
 flush()
 
