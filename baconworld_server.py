@@ -56,7 +56,7 @@ def init_globals():
         gIMAGE_STRS[p] = OrderedDict()
     
     gIMAGE_STRS['ground'][''] = img_to_str(Image.new('RGB', (TILE_WIDTH, TILE_HEIGHT), color = 'black'))
-    gIMAGE_STRS['ground']['grass'] = img_to_str(Image.new('RGB', (TILE_WIDTH, TILE_HEIGHT), color = 'green'))
+    gIMAGE_STRS['ground']['grass'] = img_to_str(Image.new('RGB', (TILE_WIDTH, TILE_HEIGHT), color = 'darkgreen'))
     gIMAGE_STRS['animals']['pig'] = img_to_str(Image.new('RGB', (TILE_WIDTH, TILE_HEIGHT), color = 'pink'))
     gIMAGE_STRS['animals']['cow'] = img_to_str(Image.new('RGB', (TILE_WIDTH, TILE_HEIGHT), color = 'orange'))
     clear()
@@ -76,7 +76,7 @@ def refresh(x1, y1, x2, y2, refresh_text=True):
             WSHandler.send_message(gTEXT[k])
 
 
-def send_update_message():    
+def send_update_message():
     WSHandler.send_message({'cmd': 'update_render', 'target': 'browser', 'data': gRENDERQUEUE})
     gRENDERQUEUE.clear()
 
@@ -150,11 +150,15 @@ class WSHandler(tornado.websocket.WebSocketHandler):
             refresh(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
         if js['cmd'] == 'set_image':
             gIMAGE_STRS[js['plane']][js['key']] = js['data']
+        if js['cmd'] == 'set_image_solid_color':
+            gIMAGE_STRS[js['plane']][js['key']] = img_to_str(Image.new('RGB', (TILE_WIDTH, TILE_HEIGHT), color=js['color']))
         if js['cmd'] == 'update_object':
             if js['x'] >=0 and js['x'] < WORLD_WIDTH and js['y'] >= 0 and js['y'] < WORLD_HEIGHT:
                 gPLANES[js['plane']][js['y']][js['x']] = js['newval']
                 update_render_queue(js['x'], js['y'])
-    
+        if js['cmd'] == 'request_settings':
+            self.send_message({'target': 'client', 'cmd': 'settings', 'settings': {'tile_width': TILE_WIDTH, 'tile_height': TILE_HEIGHT, 'world_width': WORLD_WIDTH, 'world_height': WORLD_HEIGHT}})
+
     @classmethod
     def send_message(cls, d):
         js = json.dumps(d)

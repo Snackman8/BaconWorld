@@ -11,16 +11,17 @@ import websocket
 gWS = None
 gJSON_BUFFER = ''
 gKEY_STATES = set()
+gSETTINGS = {}
 
 KEY_UP_ARROW = 38
 KEY_RIGHT_ARROW = 39
 KEY_DOWN_ARROW = 40
 KEY_LEFT_ARROW = 37
+KEY_SPACE = 32
 KEY_W = 87
 KEY_D = 68
 KEY_S = 83
 KEY_A = 65
-
 
 def draw_text(tid, text, x, y, color='white', font='16px Arial'):
     _send_message({'cmd': 'draw_text', 'text': text, 'x': x, 'y': y, 'color': color, 'tid': tid, 'font': font})
@@ -43,7 +44,7 @@ def flush():
 
 def get_keystates():
     return gKEY_STATES
-    
+
 
 def init_baconworld_magic(baconworld_server):
     global gWS
@@ -51,6 +52,11 @@ def init_baconworld_magic(baconworld_server):
                                       sockopt=((socket.IPPROTO_TCP, socket.TCP_NODELAY, 1),))
     gWS.settimeout(0.05)
     _send_message({'cmd': 'set_target_mode', 'mode': 'client'})
+    _send_message({'cmd': 'request_settings'})
+
+    while len(gSETTINGS) == 0:
+        process_bacon_messages()
+    return (gSETTINGS['tile_width'], gSETTINGS['tile_height'], gSETTINGS['world_width'], gSETTINGS['world_height'])
 
     
 def set_image(plane, key, filename):
@@ -59,11 +65,16 @@ def set_image(plane, key, filename):
                        'data': 'data:image/png;base64,' + base64.b64encode(f.read())})
 
 
+def set_image_solid_color(plane, key, color):
+    _send_message({'cmd': 'set_image_solid_color', 'plane': plane, 'key': key, 'color': color})
+
+
 def update_object(x, y, plane, newval):
         _send_message({'cmd': 'update_object', 'plane': plane, 'x': x, 'y': y, 'newval': newval})
 
 def process_bacon_messages():
     global gJSON_BUFFER
+    global gSETTINGS
     
     # try to get new data
     try:
@@ -88,3 +99,5 @@ def process_bacon_messages():
             gKEY_STATES.add(js['keycode'])
         if js['cmd'] == 'event_keyup':
             gKEY_STATES.remove(js['keycode'])
+        if js['cmd'] == 'settings':
+            gSETTINGS = js['settings']

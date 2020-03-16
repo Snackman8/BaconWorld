@@ -8,6 +8,7 @@ clear()
 
 # load image for animals / pig
 # could also load things like ground / grass
+set_image_solid_color('ground', 'grass', 'yellow')
 set_image('animals', 'pig', 'pig.png')
    
 # draw some grass
