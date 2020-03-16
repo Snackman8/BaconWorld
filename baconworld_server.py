@@ -17,10 +17,10 @@ from PIL import Image
 # Constants
 # --------------------------------------------------
 PLANE_NAMES = ['ground', 'animals']
-TILE_WIDTH = 16
-TILE_HEIGHT = 16
-WORLD_HEIGHT = 50
-WORLD_WIDTH = 110
+TILE_WIDTH = 32
+TILE_HEIGHT = 32
+WORLD_HEIGHT = 25
+WORLD_WIDTH = 55
 
 
 # --------------------------------------------------

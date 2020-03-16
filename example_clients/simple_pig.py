@@ -25,7 +25,7 @@ flush()
    
 # draw the initial pig
 x = 30
-y = 15
+y = 16
 update_object(x, y, 'animals', 'pig')
 flush()
 
@@ -40,7 +40,7 @@ while True:
         update_object(x, y, 'animals', '')
         # update the location
         x = x + 1
-        if x > 100:
+        if x > 50:
             x = 0
         # draw the new pig
         update_object(x, y, 'animals', 'pig')
