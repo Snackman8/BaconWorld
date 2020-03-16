@@ -10,6 +10,23 @@ clear()
 # could also load things like ground / grass
 set_image_solid_color('ground', 'grass', 'yellow')
 set_image('animals', 'pig', 'pig.png')
+
+# --------------------------------------------------
+# TITLE SCREEN
+# --------------------------------------------------
+# wait for game to start
+draw_text('TEXT1', 'THIS IS BACON WORLD!', 14, 2, font='64px Arial', color='white')
+draw_text('TEXT2', 'PRESS SPACEBAR TO START', 14, 10, font='32px Arial', color='white')
+flush()
+while KEY_SPACE not in get_keystates():
+    process_bacon_messages()
+clear_text('TEXT1', 10, 2)
+clear_text('TEXT2', 20, 2)
+
+
+# --------------------------------------------------
+# BEGIN GAME
+# --------------------------------------------------
    
 # draw some grass
 for y in range(0, 10):
@@ -19,11 +36,6 @@ for y in range(0, 10):
 # flush the updates to the browser
 flush()
 
-draw_text('TEXT1', 'THIS IS BACON WORLD!', 0, 0, font='48px Arial', color='white')
-draw_text('TEXT2', 'Hello World', 0, 10, font='12px Arial', color='cyan')
-#clear_text('TEXT1', 3, 1)
-flush()
-   
 # draw the initial pig
 x = 30
 y = 16

@@ -41,7 +41,9 @@ def clear():
         for x in range(0, WORLD_WIDTH):
             for p in PLANE_NAMES:
                 gPLANES[p][y][x] = ''
+    gTEXT.clear()
     refresh(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
+    
 
 
 def img_to_str(img):
